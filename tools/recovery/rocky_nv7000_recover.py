@@ -127,8 +127,6 @@ def preflight(args: argparse.Namespace) -> tuple[Path, Path]:
     kernel = check_kernel()
     if not PIPELINE.is_file():
         raise PreflightError(f"Recovery pipeline not found: {PIPELINE}")
-    if not Path("/dev/iommu").exists():
-        raise PreflightError("/dev/iommu is unavailable; IOMMUFD is not ready in this kernel.")
     device = check_target(args.bdf)
     root_source = check_root_not_on_nvme()
     fw = firmware_directory(args.firmware_dir)
@@ -145,7 +143,10 @@ def preflight(args: argparse.Namespace) -> tuple[Path, Path]:
 def bind_vfio(device: Path) -> str:
     if os.geteuid() != 0:
         raise PreflightError("Run --execute with sudo after reviewing the preflight output.")
+    subprocess.run(["modprobe", "iommufd"], check=True)
     subprocess.run(["modprobe", "vfio-pci"], check=True)
+    if not Path("/dev/iommu").exists():
+        raise PreflightError("/dev/iommu is unavailable after loading iommufd.")
     idle_d3 = Path("/sys/module/vfio_pci/parameters/disable_idle_d3")
     if not idle_d3.exists():
         raise PreflightError("vfio-pci does not expose disable_idle_d3 on this kernel.")
@@ -208,7 +209,7 @@ def main() -> int:
         cdev = bind_vfio(device)
         env = os.environ.copy()
         env["NETAC_CDEV"] = cdev
-        env["NETAC_FW_DIR"] = str(fw.parent.parent)
+        env["NETAC_FW_DIR"] = str(fw.parent)
         env["NETAC_QSIZE"] = "2"
         print(f"Starting pipeline on {device.name} through {cdev}.")
         result = subprocess.run([sys.executable, str(PIPELINE), "megaflash4"], env=env, cwd=ROOT)
