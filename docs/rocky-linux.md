@@ -1,0 +1,56 @@
+# Rocky Linux runner
+
+The recovery pipeline writes IG5236 firmware and issues NAND/FTL initialization commands. It can permanently brick the SSD and erase its contents. The runner defaults to a read-only preflight; firmware writes require \`--execute\` and an exact typed confirmation.
+
+## Support and limits
+
+- Targets Rocky Linux 10 on x86_64 with a kernel that exposes VFIO device cdev and IOMMUFD (kernel 6.6 or newer).
+- The original project was tested on a Netac NV7000 2 TB with InnoGrit IG5236 under CachyOS/Linux 7.2.3. This Rocky runner has not been hardware-tested.
+- The SSD must be the only device in its IOMMU group. Boot Rocky from a separate SATA or USB drive, not the SSD being recovered.
+- The repository does not include firmware images. Obtain the correct Netac package for the SSD's NAND variant from a trusted source. The runner checks for the exact filenames required by \`megaflash4\`; matching filenames do not prove firmware compatibility.
+- The existing \`mega4.sh\` has a hard-coded PCI address and unloads the system-wide NVMe driver. Do not use it on a machine with NVMe system/storage devices. Use the runner below, which binds only the selected PCI device.
+
+## Prepare
+
+Install Rocky Linux 10 and boot it from a separate disk. Install the standard system tools and Python 3:
+
+\`\`\`sh
+sudo dnf install python3 pciutils util-linux
+\`\`\`
+
+Place the matching firmware package so these files exist:
+
+\`\`\`text
+~/netac-recovery/m2_0536/loader.fw
+~/netac-recovery/m2_0536/programmer+cust+3SJ11+ymtcx2.fw
+~/netac-recovery/m2_0536/rdisk+cust+3SJ11+512b+hcrc+semi+l0ps+iecc+semiswitch+logerr+rel+mstripe+raid+a1perf_raid+ymtcx2-cmfg.fw
+\`\`\`
+
+The BDF is the PCI address shown by \`lspci -Dnn\` for the IG5236 controller, for example \`0000:03:00.0\`. Confirm the address physically corresponds to the Netac NV7000 2 TB before proceeding.
+
+## Read-only preflight
+
+From the repository root, run the checker without \`--execute\`:
+
+\`\`\`sh
+python3 tools/recovery/rocky_nv7000_recover.py \
+  --bdf 0000:03:00.0 \
+  --firmware-dir ~/netac-recovery
+\`\`\`
+
+It checks OS/kernel requirements, controller PCI identity, IOMMU-group isolation, root-disk placement, and firmware files. It does not change device settings or write firmware.
+
+## Firmware recovery
+
+Only after confirming the target and firmware variant, run:
+
+\`\`\`sh
+sudo python3 tools/recovery/rocky_nv7000_recover.py \
+  --bdf 0000:03:00.0 \
+  --firmware-dir /home/USER/netac-recovery \
+  --execute
+\`\`\`
+
+The program asks for the exact phrase \`ERASE DATA AND RECOVER NETAC NV7000 2TB\`. It then binds that PCI device to VFIO and launches the repository's \`megaflash4\` pipeline. Do not interrupt it. Afterward, shut the computer fully off before powering it back on; a warm reboot may leave the SSD in programmer mode.
+
+If the pipeline fails or stops partway, do not retry or rebind the device blindly. Capture the console output and get technical review first.
