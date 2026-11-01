@@ -3,7 +3,7 @@
 
 Default mode is read-only preflight. Firmware writes require --execute and an
 exact interactive confirmation. This utility has not been hardware-tested on
-Rocky Linux; see docs/rocky-linux.md before use.
+Rocky Linux or Ubuntu; see docs/rocky-linux.md before use.
 """
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def check_kernel() -> str:
     if not match or tuple(map(int, match.groups())) < (6, 6):
         raise PreflightError(
             f"Kernel {release} is below 6.6; this pipeline requires VFIO device cdev + IOMMUFD. "
-            "Use a supported Rocky Linux 10 kernel; do not install a third-party kernel for this recovery."
+            "Use Ubuntu 26.04 live media or Rocky Linux 10; do not install a third-party kernel for this recovery."
         )
     return release
 
@@ -98,7 +98,7 @@ def check_root_not_on_nvme() -> str:
     tree = command_output("lsblk", "-s", "-nr", "-o", "NAME", source)
     if re.search(r"\bnvme\d+n\d+\b", tree):
         raise PreflightError(
-            "The Rocky Linux root filesystem is on NVMe. Boot Rocky from a separate SATA/USB disk "
+            "The running OS root filesystem is on NVMe. Boot Rocky from a separate SATA/USB disk "
             "before recovery; this tool must not risk the running system disk."
         )
     return source
@@ -128,7 +128,7 @@ def preflight(args: argparse.Namespace) -> tuple[Path, Path]:
             f"Detected {os_info.get('PRETTY_NAME', 'unknown OS')}; supported systems are Rocky Linux 10 and Ubuntu 26.04."
         )
     if platform.machine() != "x86_64":
-        raise PreflightError("This runner only supports x86_64 Rocky Linux.")
+        raise PreflightError("This runner only supports x86_64 systems.")
     kernel = check_kernel()
     if not PIPELINE.is_file():
         raise PreflightError(f"Recovery pipeline not found: {PIPELINE}")
