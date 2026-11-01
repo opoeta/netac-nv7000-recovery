@@ -8,6 +8,7 @@ Rocky Linux or Ubuntu; see docs/rocky-linux.md before use.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import platform
 import re
@@ -65,6 +66,33 @@ def check_kernel() -> str:
     return release
 
 
+def check_target_not_mounted(device: Path) -> None:
+    nvme_root = device / "nvme"
+    for controller in nvme_root.glob("nvme*"):
+        for namespace in controller.glob("nvme*n*"):
+            if not re.fullmatch(r"nvme\d+n\d+", namespace.name):
+                continue
+            node = f"/dev/{namespace.name}"
+            try:
+                tree = json.loads(
+                    command_output("lsblk", "--json", "--paths", "--output", "NAME,MOUNTPOINTS", node)
+                )
+            except PreflightError as exc:
+                raise PreflightError(f"Cannot verify whether target namespace {node} is in use: {exc}") from exc
+
+            def has_mount(entry: dict) -> bool:
+                mounts = entry.get("mountpoints") or []
+                return any(mount for mount in mounts) or any(
+                    has_mount(child) for child in entry.get("children", [])
+                )
+
+            if any(has_mount(entry) for entry in tree.get("blockdevices", [])):
+                raise PreflightError(
+                    f"Target namespace {node} or one of its partitions is mounted or used as swap. "
+                    "Unmount/deactivate it before recovery."
+                )
+
+
 def check_target(bdf: str) -> Path:
     if not re.fullmatch(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]", bdf):
         raise PreflightError("BDF must look like 0000:03:00.0.")
@@ -90,6 +118,7 @@ def check_target(bdf: str) -> Path:
             f"IOMMU group for {bdf} also contains {', '.join(members)}. "
             "Isolate the SSD in a group by itself before recovery."
         )
+    check_target_not_mounted(device)
     return device
 
 
