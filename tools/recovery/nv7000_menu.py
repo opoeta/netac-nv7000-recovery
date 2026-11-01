@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -46,8 +47,7 @@ def run_runner(bdf: str, firmware_root: Path, execute: bool = False) -> int:
 
 def show_post_recovery() -> None:
     print("\nRead-only NVMe inventory:")
-    nvme_cli = subprocess.run(["sh", "-c", "command -v nvme"], text=True, capture_output=True)
-    if nvme_cli.returncode != 0:
+    if shutil.which("nvme") is None:
         print("nvme-cli is not installed. On Ubuntu Live, install it with: sudo apt install nvme-cli")
         return
     subprocess.run(["nvme", "list"], check=False)
