@@ -117,7 +117,12 @@ def main() -> int:
             if not preflight_passed:
                 print("Preflight failed. No firmware was written.")
                 continue
-            print("\nThis operation may permanently brick the SSD and erase its data.")
+            print("\nThis branch flashes firmware built for the YMTC X2 NAND variant.")
+            variant = input("Only if the NAND package marking confirms YMTC X2, type YMTC-X2: ").strip()
+            if variant != "YMTC-X2":
+                print("Cancelled. NAND variant was not confirmed.")
+                continue
+            print("This operation may permanently brick the SSD and erase its data.")
             answer = input("Type START to open the runner's final erase confirmation: ").strip()
             if answer == "START":
                 result = run_runner(selected_bdf, firmware_root, execute=True)
