@@ -118,9 +118,14 @@ def firmware_directory(value: str) -> Path:
 
 def preflight(args: argparse.Namespace) -> tuple[Path, Path]:
     os_info = parse_os_release()
-    if os_info.get("ID") != "rocky" or not os_info.get("VERSION_ID", "").startswith("10."):
+    supported = (
+        os_info.get("ID") == "rocky" and os_info.get("VERSION_ID", "").startswith("10.")
+    ) or (
+        os_info.get("ID") == "ubuntu" and os_info.get("VERSION_ID", "").startswith("26.04")
+    )
+    if not supported:
         raise PreflightError(
-            f"Detected {os_info.get('PRETTY_NAME', 'unknown OS')}; this runner only supports Rocky Linux 10."
+            f"Detected {os_info.get('PRETTY_NAME', 'unknown OS')}; supported systems are Rocky Linux 10 and Ubuntu 26.04."
         )
     if platform.machine() != "x86_64":
         raise PreflightError("This runner only supports x86_64 Rocky Linux.")
