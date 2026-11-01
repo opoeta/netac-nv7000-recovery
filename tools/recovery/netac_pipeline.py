@@ -386,6 +386,19 @@ def main():
         if not ident:
             sys.exit(3)
         sn, mn, fr = ident
+        rom_signature = sn == "SSD-5236" and mn == "MN-5236" and fr == "2.0.0.3"
+        runtime_signature = (
+            mn == "INNOGRIT"
+            and sn in {"SSD-DRAM-120216-V", "SSD-DRAM-120216-F"}
+            and fr == "3.S.J.11"
+        )
+        if not (rom_signature or runtime_signature):
+            print(
+                "Refusing to write: unsupported initial identity. Expected the documented "
+                "Netac IG5236 ROM or 3.S.J.11 runtime signature; got "
+                f"SN={sn!r} MN={mn!r} FR={fr!r}"
+            )
+            sys.exit(4)
 
         if "MN-5236" in mn or "SSD-5236" in sn:
             print("== ROM personality: ToRecovery + loader ==")
