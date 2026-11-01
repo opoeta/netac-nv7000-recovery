@@ -95,14 +95,19 @@ def check_target(bdf: str) -> Path:
 
 def check_root_not_on_nvme() -> str:
     source = command_output("findmnt", "-nro", "SOURCE", "/")
-    tree = command_output("lsblk", "-s", "-nr", "-o", "NAME", source)
+    # Ubuntu live desktop boots with overlay root; resolve its USB boot medium.
+    block_source = source
+    if source.startswith("overlay"):
+        block_source = command_output("findmnt", "-nro", "SOURCE", "/cdrom")
+        if not block_source:
+            raise PreflightError("Live root is overlay but /cdrom has no identifiable boot medium.")
+    tree = command_output("lsblk", "-s", "-nr", "-o", "NAME", block_source)
     if re.search(r"\bnvme\d+n\d+\b", tree):
         raise PreflightError(
-            "The running OS root filesystem is on NVMe. Boot Rocky from a separate SATA/USB disk "
+            "The running OS or its boot medium is backed by NVMe. Boot from a separate USB/SATA medium "
             "before recovery; this tool must not risk the running system disk."
         )
-    return source
-
+    return f"{source} (backing device: {block_source})" if source.startswith("overlay") else source
 
 def firmware_directory(value: str) -> Path:
     directory = Path(value).expanduser().resolve() / "m2_0536"
