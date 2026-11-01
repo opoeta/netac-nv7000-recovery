@@ -4,7 +4,7 @@ The recovery pipeline writes IG5236 firmware and issues NAND/FTL initialization 
 
 ## Support and limits
 
-- Targets Rocky Linux 10 on x86_64 with a kernel that exposes VFIO device cdev and IOMMUFD (kernel 6.6 or newer).
+- Targets Rocky Linux 10 or Ubuntu 26.04 on x86_64 with a kernel that exposes VFIO device cdev and IOMMUFD (kernel 6.6 or newer). The Ubuntu path is intended for the Desktop live USB session.
 - The original project was tested on a Netac NV7000 2 TB with InnoGrit IG5236 under CachyOS/Linux 7.2.3. This Rocky runner has not been hardware-tested.
 - The SSD must be the only device in its IOMMU group. Boot Rocky from a separate SATA or USB drive, not the SSD being recovered.
 - The repository does not include firmware images. Obtain the correct Netac package for the SSD's NAND variant from a trusted source. The runner checks for the exact filenames required by \`megaflash4\`; matching filenames do not prove firmware compatibility.
@@ -12,7 +12,9 @@ The recovery pipeline writes IG5236 firmware and issues NAND/FTL initialization 
 
 ## Prepare
 
-Install Rocky Linux 10 and boot it from a separate disk. Install the standard system tools and Python 3:
+Use either Rocky Linux 10 booted from a separate disk or Ubuntu 26.04 Desktop via **Try Ubuntu** from a bootable USB. Ubuntu's live session avoids installing over Rocky 9.5; store the repository and matching firmware on a second USB or another non-target disk. The USB creation process erases the selected USB stick.
+
+On Rocky, install standard tools and Python 3:
 
 \`\`\`sh
 sudo dnf install python3 pciutils util-linux
@@ -28,6 +30,16 @@ Place the matching firmware package so these files exist:
 
 The BDF is the PCI address shown by \`lspci -Dnn\` for the IG5236 controller, for example \`0000:03:00.0\`. Confirm the address physically corresponds to the Netac NV7000 2 TB before proceeding.
 
+## Menu
+
+From the repository root, start the interactive menu:
+
+```sh
+python3 tools/recovery/nv7000_menu.py
+```
+
+Use it to select the IG5236 PCI address, set the firmware package directory, run preflight, start recovery, and inspect the SSD afterward. Recovery runs only after preflight and two explicit confirmations. The menu does not download firmware or install packages automatically.
+
 ## Read-only preflight
 
 From the repository root, run the checker without \`--execute\`:
@@ -38,7 +50,7 @@ python3 tools/recovery/rocky_nv7000_recover.py \
   --firmware-dir ~/netac-recovery
 \`\`\`
 
-It checks OS/kernel requirements, controller PCI identity, IOMMU-group isolation, root-disk placement, and firmware files. It does not change device settings or write firmware.
+It checks OS/kernel requirements, controller PCI identity, IOMMU-group isolation, root/boot-medium placement, and firmware files. It does not change device settings or write firmware.
 
 ## Firmware recovery
 
